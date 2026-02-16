@@ -59,6 +59,9 @@ class AgentLoop:
         context_window_tokens: int = 65_536,
         web_search_config: WebSearchConfig | None = None,
         web_proxy: str | None = None,
+        search_provider: str = "brave",
+        searxng_url: str = "",
+        search_max_results: int = 5,
         exec_config: ExecToolConfig | None = None,
         cron_service: CronService | None = None,
         restrict_to_workspace: bool = False,
@@ -77,6 +80,9 @@ class AgentLoop:
         self.context_window_tokens = context_window_tokens
         self.web_search_config = web_search_config or WebSearchConfig()
         self.web_proxy = web_proxy
+        self.search_provider = search_provider
+        self.searxng_url = searxng_url
+        self.search_max_results = search_max_results
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
@@ -139,7 +145,11 @@ class AgentLoop:
                 path_append=self.exec_config.path_append,
                 sandbox=self.exec_config.sandbox,
             ))
-        self.tools.register(WebSearchTool(config=self.web_search_config, proxy=self.web_proxy))
+        self.tools.register(WebSearchTool(
+            provider=self.search_provider, api_key=self.brave_api_key,
+            base_url=self.searxng_url, max_results=self.search_max_results,
+            proxy=self.web_proxy,
+        ))
         self.tools.register(WebFetchTool(proxy=self.web_proxy))
         self.tools.register(MessageTool(send_callback=self.bus.publish_outbound))
         self.tools.register(SpawnTool(manager=self.subagents))

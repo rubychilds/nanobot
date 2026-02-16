@@ -130,7 +130,7 @@ class WebSearchTool(Tool):
             return _format_results(query, items, n)
         except Exception as e:
             return f"Error: {e}"
-
+    
     async def _search_tavily(self, query: str, n: int) -> str:
         api_key = self.config.api_key or os.environ.get("TAVILY_API_KEY", "")
         if not api_key:
