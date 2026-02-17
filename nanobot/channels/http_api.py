@@ -15,6 +15,8 @@ class ChatRequest(BaseModel):
     session_key: str = "api:default"
     channel: str = "api"
     chat_id: str = "default"
+    extra_system_prompt: str | None = None
+    extra_env: dict[str, str] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -70,6 +72,8 @@ class HTTPAPIChannel:
                 session_key=req.session_key,
                 channel=req.channel,
                 chat_id=req.chat_id,
+                extra_system_prompt=req.extra_system_prompt,
+                extra_env=req.extra_env,
             )
             return ChatResponse(response=response, session_key=req.session_key)
 

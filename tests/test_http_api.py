@@ -69,6 +69,8 @@ def test_chat_endpoint():
         session_key="test-session",
         channel="api",
         chat_id="default",
+        extra_system_prompt=None,
+        extra_env=None,
     )
 
 
@@ -132,6 +134,62 @@ def test_health_no_auth_required():
     client, _ = _make_test_client(auth_token="my-token")
     resp = client.get("/api/v1/health")
     assert resp.status_code == 200
+
+
+def test_chat_endpoint_extra_system_prompt():
+    """POST /api/v1/chat passes extra_system_prompt to process_direct."""
+    client, mock_agent = _make_test_client()
+    resp = client.post("/api/v1/chat", json={
+        "message": "Hello",
+        "extra_system_prompt": "You are a CRM assistant for Acme Corp.",
+    })
+    assert resp.status_code == 200
+    mock_agent.process_direct.assert_called_once_with(
+        content="Hello",
+        session_key="api:default",
+        channel="api",
+        chat_id="default",
+        extra_system_prompt="You are a CRM assistant for Acme Corp.",
+        extra_env=None,
+    )
+
+
+def test_chat_endpoint_extra_env():
+    """POST /api/v1/chat passes extra_env to process_direct."""
+    client, mock_agent = _make_test_client()
+    resp = client.post("/api/v1/chat", json={
+        "message": "Check my PRs",
+        "extra_env": {"GITHUB_TOKEN": "ghp_abc123"},
+    })
+    assert resp.status_code == 200
+    mock_agent.process_direct.assert_called_once_with(
+        content="Check my PRs",
+        session_key="api:default",
+        channel="api",
+        chat_id="default",
+        extra_system_prompt=None,
+        extra_env={"GITHUB_TOKEN": "ghp_abc123"},
+    )
+
+
+def test_chat_endpoint_both_extras():
+    """POST /api/v1/chat passes both extra_system_prompt and extra_env."""
+    client, mock_agent = _make_test_client()
+    resp = client.post("/api/v1/chat", json={
+        "message": "Hello",
+        "session_key": "orbis:user-123",
+        "extra_system_prompt": "Skills: <skill name='GitHub'>...</skill>",
+        "extra_env": {"GITHUB_TOKEN": "ghp_abc", "LINEAR_API_KEY": "lin_xyz"},
+    })
+    assert resp.status_code == 200
+    mock_agent.process_direct.assert_called_once_with(
+        content="Hello",
+        session_key="orbis:user-123",
+        channel="api",
+        chat_id="default",
+        extra_system_prompt="Skills: <skill name='GitHub'>...</skill>",
+        extra_env={"GITHUB_TOKEN": "ghp_abc", "LINEAR_API_KEY": "lin_xyz"},
+    )
 
 
 def test_chat_session_isolation():
