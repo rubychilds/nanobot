@@ -28,6 +28,7 @@ from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.command import CommandContext, CommandRouter, register_builtin_commands
 from nanobot.bus.queue import MessageBus
 from nanobot.providers.base import LLMProvider
+from nanobot.agent.tools.orbis_crm import OrbisCRMTool
 from nanobot.session.manager import Session, SessionManager
 
 if TYPE_CHECKING:
@@ -155,6 +156,9 @@ class AgentLoop:
         self.tools.register(SpawnTool(manager=self.subagents))
         if self.cron_service:
             self.tools.register(CronTool(self.cron_service))
+
+        # Orbis CRM tool (credentials injected per-request via extra_env)
+        self.tools.register(OrbisCRMTool())
 
     async def _connect_mcp(self) -> None:
         """Connect to configured MCP servers (one-time, lazy)."""
