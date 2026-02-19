@@ -246,11 +246,13 @@ async def _handle_download(spec: InstallSpec) -> InstallResult:
             if filepath.suffix in _EXECUTABLE_SUFFIXES:
                 filepath.chmod(0o755)
 
+        logger.info(f"  Downloaded {filename} -> {install_dir}")
         return InstallResult(
             spec_id=spec_id, ok=True,
             message=f"Downloaded to {install_dir}", kind="download",
         )
     except Exception as e:
+        logger.error(f"  Download failed for {spec_id}: {e}")
         return InstallResult(spec_id=spec_id, ok=False, message=str(e), kind="download")
 
 
