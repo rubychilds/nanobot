@@ -200,6 +200,11 @@ async def _run_install(argv: list[str], timeout: float = 300) -> tuple[bool, str
         return False, f"command not found: {argv[0]!r}"
 
 
+_EXECUTABLE_SUFFIXES = frozenset({".py", ".sh", ".js", ".mjs", ""})
+_SKILL_TOOLS_DIR = Path("/root/.nanobot/skill-tools")
+_SKILL_BIN_DIR = Path("/usr/local/bin")
+
+
 async def _handle_download(spec: InstallSpec) -> InstallResult:
     """Handle a 'download' install spec using httpx + tarfile (no shell)."""
     import tarfile
@@ -212,7 +217,7 @@ async def _handle_download(spec: InstallSpec) -> InstallResult:
     if err:
         return InstallResult(spec_id=spec_id, ok=False, message=err, kind="download")
 
-    install_dir = Path("/root/.nanobot/skill-tools") / spec_id
+    install_dir = _SKILL_TOOLS_DIR / spec_id
     install_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -236,6 +241,10 @@ async def _handle_download(spec: InstallSpec) -> InstallResult:
                 with tarfile.open(filepath) as tf:
                     tf.extractall(install_dir)
             filepath.unlink(missing_ok=True)
+        else:
+            # Make script files executable
+            if filepath.suffix in _EXECUTABLE_SUFFIXES:
+                filepath.chmod(0o755)
 
         return InstallResult(
             spec_id=spec_id, ok=True,
@@ -243,6 +252,40 @@ async def _handle_download(spec: InstallSpec) -> InstallResult:
         )
     except Exception as e:
         return InstallResult(spec_id=spec_id, ok=False, message=str(e), kind="download")
+
+
+def _symlink_skill_bins(skill_slug: str, all_specs: list[InstallSpec]) -> None:
+    """After all downloads for a skill, symlink declared bins to /usr/local/bin."""
+    # Collect all declared bins from all specs
+    bins: set[str] = set()
+    for spec in all_specs:
+        bins.update(spec.bins)
+
+    if not bins:
+        return
+
+    # Search for matching files in the skill-tools directory
+    skill_dir = _SKILL_TOOLS_DIR
+    for bin_name in bins:
+        # Look for the bin in any subdirectory of skill-tools
+        for candidate in skill_dir.rglob(bin_name):
+            if candidate.is_file():
+                link_path = _SKILL_BIN_DIR / bin_name
+                link_path.unlink(missing_ok=True)
+                link_path.symlink_to(candidate)
+                candidate.chmod(0o755)
+                logger.info(f"Symlinked {bin_name} -> {candidate}")
+                break
+        # Also check for bin_name.py, bin_name.sh variants
+        for ext in (".py", ".sh"):
+            for candidate in skill_dir.rglob(f"{bin_name}{ext}"):
+                if candidate.is_file():
+                    link_path = _SKILL_BIN_DIR / bin_name
+                    link_path.unlink(missing_ok=True)
+                    link_path.symlink_to(candidate)
+                    candidate.chmod(0o755)
+                    logger.info(f"Symlinked {bin_name} -> {candidate}")
+                    break
 
 
 class HTTPAPIChannel:
@@ -350,6 +393,16 @@ class HTTPAPIChannel:
                     results.append(InstallResult(
                         spec_id=spec_id, ok=ok, message=msg, kind=spec.kind,
                     ))
+
+                # Symlink declared bins after all downloads complete
+                has_downloads = any(
+                    r.kind == "download" and r.ok for r in results
+                )
+                if has_downloads:
+                    try:
+                        _symlink_skill_bins(req.skill_slug, req.install_specs)
+                    except Exception as e:
+                        logger.warning(f"Failed to symlink bins: {e}")
 
                 all_ok = all(r.ok for r in results)
                 return InstallResponse(
