@@ -12,6 +12,14 @@ RUN apt-get update && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
+# Install Go 1.23 for ClawhHub skill dependencies (go install at runtime)
+ENV GOLANG_VERSION=1.23.6
+RUN curl -fsSL "https://go.dev/dl/go${GOLANG_VERSION}.linux-amd64.tar.gz" \
+      | tar -C /usr/local -xzf - && \
+    ln -s /usr/local/go/bin/go /usr/local/bin/go
+ENV GOPATH=/root/go
+ENV PATH="${GOPATH}/bin:${PATH}"
+
 WORKDIR /app
 
 # Install Python dependencies first (cached layer)

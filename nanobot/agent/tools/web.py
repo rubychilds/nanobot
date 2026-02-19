@@ -96,6 +96,9 @@ class WebSearchTool(Tool):
         provider = self.config.provider.strip().lower() or "brave"
         n = min(max(count or self.config.max_results, 1), 10)
 
+        # Use per-request env if available (Orbis passes user credentials this way)
+        env = kwargs.get("env") or {}
+
         if provider == "duckduckgo":
             return await self._search_duckduckgo(query, n)
         elif provider == "tavily":
@@ -105,12 +108,12 @@ class WebSearchTool(Tool):
         elif provider == "jina":
             return await self._search_jina(query, n)
         elif provider == "brave":
-            return await self._search_brave(query, n)
+            return await self._search_brave(query, n, env=env)
         else:
             return f"Error: unknown search provider '{provider}'"
 
-    async def _search_brave(self, query: str, n: int) -> str:
-        api_key = self.config.api_key or os.environ.get("BRAVE_API_KEY", "")
+    async def _search_brave(self, query: str, n: int, env: dict[str, str] | None = None) -> str:
+        api_key = self.config.api_key or (env or {}).get("BRAVE_API_KEY", "") or os.environ.get("BRAVE_API_KEY", "")
         if not api_key:
             logger.warning("BRAVE_API_KEY not set, falling back to DuckDuckGo")
             return await self._search_duckduckgo(query, n)
